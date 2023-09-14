@@ -1,16 +1,17 @@
 package com.example.RyanairJavaTask.Models;
 
+import java.time.LocalDateTime;
+
 //This class represents a flight 
 public class Flight {
 
     private String departureAirport;
     private String arivalAirport;
-    private String departureDateTime;
-    private String arrivalDateTime;
+    private LocalDateTime departureDateTime;
+    private LocalDateTime arrivalDateTime;
 
-   
-
-    public Flight(String departureAirport, String arivalAirport, String departureDateTime, String arrivalDateTime) {
+    public Flight(String departureAirport, String arivalAirport, LocalDateTime departureDateTime,
+            LocalDateTime arrivalDateTime) {
         this.departureAirport = departureAirport;
         this.arivalAirport = arivalAirport;
         this.departureDateTime = departureDateTime;
@@ -33,19 +34,26 @@ public class Flight {
         this.arivalAirport = arivalAirport;
     }
 
-    public String getDepartureDateTime() {
+    public LocalDateTime getDepartureDateTime() {
         return departureDateTime;
     }
 
-    public void setDepartureDateTime(String departureDateTime) {
+    public void setDepartureDateTime(LocalDateTime departureDateTime) {
         this.departureDateTime = departureDateTime;
     }
 
-    public String getArrivalDateTime() {
+    public LocalDateTime getArrivalDateTime() {
         return arrivalDateTime;
     }
 
-    public void setArrivalDateTime(String arrivalDateTime) {
+    public void setArrivalDateTime(LocalDateTime arrivalDateTime) {
         this.arrivalDateTime = arrivalDateTime;
     }
+
+    @Override
+    public String toString() {
+        return "{\"departureAirport\":\"" + departureAirport + "\", \"arivalAirport\":\"" + arivalAirport
+                + "\", \"departureDateTime\":\"" + departureDateTime + "\", \"arrivalDateTime\":\"" + arrivalDateTime + "\"}";
+    }
+
 }

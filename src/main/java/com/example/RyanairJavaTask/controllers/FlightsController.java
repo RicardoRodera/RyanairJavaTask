@@ -1,92 +1,240 @@
 package com.example.RyanairJavaTask.controllers;
 
+import java.time.LocalDateTime;
 import java.time.Month;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
-import org.springframework.format.annotation.DateTimeFormat.ISO;
 import org.springframework.web.client.RestTemplate;
 
-import com.example.RyanairJavaTask.Models.Day;
 import com.example.RyanairJavaTask.Models.Flight;
-import com.example.RyanairJavaTask.Models.FlightsResponse;
 
 public class FlightsController {
 
-    private ArrayList<Flight> flights = new ArrayList<>();
+    private final String FLIGHTS_API_BASE_ROUTE = "https://services-api.ryanair.com/timtbl/3/schedules/";
+    private final String ROUTES_API_ROUTE = "https://services-api.ryanair.com/views/locate/3/routes";
+    private ArrayList<Flight> directFlights = new ArrayList<>();
+    private ArrayList<Flight> interconnectedFlights = new ArrayList<>();
+    private ArrayList<String> interconnectingAirports = new ArrayList<>();
+    private String departure;
+    private String arrival;
+    private LocalDateTime departureDateTime;
+    private LocalDateTime arrivalDateTime;
+    private RestTemplate restTemplate = new RestTemplate();
+
     public String comprobacion = "";
 
-    private final String API_BASE_ROUTE = "https://services-api.ryanair.com/timtbl/3/schedules/DUB/WRO/";
+    public FlightsController(String departure, LocalDateTime departureDateTime, String arrival,
+            LocalDateTime arrivalDateTime) {
 
-    public FlightsController(int year, int month, int dayOfMonth, int hour, int minute, String departureAirport,
-            String arrivalAirport) {
-        // String apiRoute = API_BASE_ROUTE + "years/" + year + "/months/" + month;
-        String apiRoute = "https://services-api.ryanair.com/timtbl/3/schedules/DUB/WRO/years/2024/months/3";
-        RestTemplate restTemplate = new RestTemplate();
+        this.departure = departure;
+        this.arrival = arrival;
+        this.departureDateTime = departureDateTime;
+        this.arrivalDateTime = arrivalDateTime;
+
+        // Period period = Period.between(departureDateTime.toLocalDate(),
+        // arrivalDateTime.toLocalDate());
+
+        // Check if there are intermediate airports for a "one stop" route;
+        this.interconnectingAirports = getInterconnectingAirports(this.departure, this.arrival);
+
+        if (departureDateTime.getYear() != arrivalDateTime.getYear()) {
+            for (int year = departureDateTime.getYear(); year <= arrivalDateTime.getYear(); year++) {
+                if (year == departureDateTime.getYear()) {
+                    for (int month = departureDateTime.getMonthValue(); month <= Month.DECEMBER.getValue(); month++) {
+                        addDirectFlightsOfYearAndMonth(departure, arrival, year, month);
+                    }
+                } else {
+                    if (year == arrivalDateTime.getYear()) {
+                        for (int month = Month.JANUARY.getValue(); month <= arrivalDateTime.getMonthValue(); month++) {
+                            addDirectFlightsOfYearAndMonth(departure, arrival, year, month);
+                        }
+                    } else {
+                        for (int month = Month.JANUARY.getValue(); month <= Month.DECEMBER.getValue(); month++) {
+                            addDirectFlightsOfYearAndMonth(departure, arrival, year, month);
+                        }
+                    }
+                }
+            }
+        } else {
+            for (int month = departureDateTime.getMonthValue(); month <= arrivalDateTime.getMonthValue(); month++) {
+                addDirectFlightsOfYearAndMonth(departure, arrival, departureDateTime.getYear(), month);
+            }
+        }
+    }
+
+    private ArrayList<String> getInterconnectingAirports(String departure, String arrival) {
+        ArrayList<String> possibleInterconnections = new ArrayList<>();
+        ArrayList<String> finalInterconnections = new ArrayList<>();
+
+        String response = restTemplate.getForObject(ROUTES_API_ROUTE, String.class);
+        JSONArray jsonRoutes = new JSONArray(response);
+
+        for (Object route : jsonRoutes) {
+            if (route instanceof JSONObject) {
+                JSONObject jsonRoute = (JSONObject) route;
+
+                if (jsonRoute.getString("operator").equals("RYANAIR")
+                        && (jsonRoute.getString("airportFrom").equals(departure)
+                                || jsonRoute.getString("airportTo").equals(arrival))) {
+                    if (jsonRoute.getString("airportFrom").equals(departure)
+                            && !jsonRoute.getString("airportTo").equals(arrival)) {
+
+                        if (possibleInterconnections.contains(jsonRoute.getString("airportTo"))) {
+                            finalInterconnections.add(jsonRoute.getString("airportTo"));
+                        } else {
+                            possibleInterconnections.add(jsonRoute.getString("airportTo"));
+                        }
+
+                    } else if (!jsonRoute.getString("airportFrom").equals(departure)
+                            && jsonRoute.getString("airportTo").equals(arrival)) {
+                        if (possibleInterconnections.contains(jsonRoute.getString("airportFrom"))) {
+                            finalInterconnections.add(jsonRoute.getString("airportFrom"));
+                        } else {
+                            possibleInterconnections.add(jsonRoute.getString("airportFrom"));
+                        }
+                    }
+                }
+            }
+        }
+        return finalInterconnections;
+    }
+
+    private void addDirectFlightsOfYearAndMonth(String departure, String arrival, int year, int month) {
+
+        String apiRoute = "";
+
+        apiRoute = generateApiRoute(departure, arrival, departureDateTime.getYear(),
+                departureDateTime.getMonthValue());
+
+        // Call the api and store the flights locally
         String response = restTemplate.getForObject(apiRoute, String.class);
         JSONObject jsonResponse = new JSONObject(response);
-        JSONArray jsonDays = new JSONArray(jsonResponse.get("days").toString());
+        JSONArray jsonDays = (JSONArray) (jsonResponse.get("days"));
         if (!jsonDays.isEmpty()) {
+
             for (Object day : jsonDays) {
                 if (day instanceof JSONObject) {
                     JSONObject dayObject = (JSONObject) day;
 
-                    // Check that only direct flights between the day of departure and arrival are
-                    // added.
+                    if (dayObject.getInt("day") >= departureDateTime.getDayOfMonth()
+                            && (dayObject.getInt("day") <= arrivalDateTime.getDayOfMonth())) {
 
-                    // ! Añadir la comprobación de que no sea el dia de llegada o posterior, la hora de llegada es menor si llega el día siguiente !!!! mucho cuidado con esto
-
-                    if (dayObject.getInt("day") >= dayOfMonth) {
-
-                        JSONArray jsonFlights = (JSONArray)dayObject.get("flights");
+                        JSONArray jsonFlights = (JSONArray) dayObject.get("flights");
                         for (Object flight : jsonFlights) {
                             if (flight instanceof JSONObject) {
                                 JSONObject flightObject = (JSONObject) flight;
-                                
-                                // if (checkDepartureTime(hour, minute, flightObject.getString("departureTime")) && checkArrivalTime(hour, minute, flightObject.getString("arrivalTime"))) {
 
-                                    String departureDateTime = year + "-" + month + "-" + dayOfMonth + "T"
-                                            + flightObject.getString("departureTime");
-                                    String arrivalDateTime = year + "-" + month + "-" + dayOfMonth + "T"
-                                            + flightObject.getString("arrivalTime");
-                                    flights.add(new Flight(departureAirport, arrivalAirport, departureDateTime,
-                                            arrivalDateTime));
-                                    comprobacion += ";" + departureDateTime;
-                                // }
+                                LocalDateTime flightDepartureDateTime = generateFlightDateTime(
+                                        this.departureDateTime.getYear(), this.departureDateTime.getMonthValue(),
+                                        dayObject.getInt("day"), flightObject.getString("departureTime"));
+
+                                LocalDateTime flightArrivalDateTime = generateFlightDateTime(
+                                        departureDateTime.getYear(), departureDateTime.getMonthValue(),
+                                        dayObject.getInt("day"), flightObject.getString("arrivalTime"));
+
+                                if (flightDepartureDateTime.isAfter(departureDateTime)
+                                        || flightDepartureDateTime.isEqual(departureDateTime)
+                                                && flightArrivalDateTime.isBefore(arrivalDateTime)
+                                        || flightArrivalDateTime.isEqual(arrivalDateTime)) {
+                                    directFlights.add(new Flight(departure, arrival, flightDepartureDateTime,
+                                            flightArrivalDateTime));
+                                }
                             }
                         }
                     }
                 }
             }
         } else {
-            // No hay vuelos para esos destinos ese mes
+            // !! NO HAY VUELOS
         }
     }
 
-    private boolean checkArrivalTime(int scheduledHour, int ScheduledMinute, String arrivalTime) {
-        int arrivalHour = Integer.valueOf(arrivalTime.substring(0,2));
-        if(arrivalHour > scheduledHour){
-            return false;
-        } else if (arrivalHour == scheduledHour){
-            int arrivalMinute = Integer.valueOf(arrivalTime.substring(3,5));
-            if(arrivalMinute >= ScheduledMinute){
-                return false;
-            }
-        } 
-        return true;
+    private LocalDateTime generateFlightDateTime(int year, int month, int day, String flightTime) {
+        StringBuilder sb = new StringBuilder().append(year).append("-");
+        if (month < 10) {
+            sb.append("0");
+        }
+        sb.append(month).append("-");
+        if (day < 10) {
+            sb.append("0");
+        }
+        sb.append(day).append("T").append(flightTime);
+        DateTimeFormatter dateFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm");
+        LocalDateTime flightDateTime = LocalDateTime.parse(sb.toString(), dateFormat);
+        return flightDateTime;
     }
 
-    private boolean checkDepartureTime(int scheduledHour, int ScheduledMinute, String departureTime) {
-        int departureHour = Integer.valueOf(departureTime.substring(0,2));
-        if(departureHour > scheduledHour){
-            return true;
-        } else if (departureHour == scheduledHour){
-            int departureMinute = Integer.valueOf(departureTime.substring(3,5));
-            if(departureMinute >= ScheduledMinute){
-                return true;
-            }
-        } 
-        return false;
+    private String generateApiRoute(String departure, String arrival, int year, int month) {
+        StringBuilder sb = new StringBuilder(FLIGHTS_API_BASE_ROUTE);
+        sb.append(departure).append("/").append(arrival);
+        sb.append("/years/").append(year).append("/months/").append(month);
+        return sb.toString();
+    }
+
+    public ArrayList<Flight> getDirectFlights() {
+        return directFlights;
+    }
+
+    public void setDirectFlights(ArrayList<Flight> directFlights) {
+        this.directFlights = directFlights;
+    }
+
+    public ArrayList<Flight> getInterconnectedFlights() {
+        return interconnectedFlights;
+    }
+
+    public void setInterconnectedFlights(ArrayList<Flight> interconnectedFlights) {
+        this.interconnectedFlights = interconnectedFlights;
+    }
+
+    public ArrayList<String> getInterconnectingAirports() {
+        return interconnectingAirports;
+    }
+
+    public void setInterconnectingAirports(ArrayList<String> interconnectingAirports) {
+        this.interconnectingAirports = interconnectingAirports;
+    }
+
+    public String getDeparture() {
+        return departure;
+    }
+
+    public void setDeparture(String departure) {
+        this.departure = departure;
+    }
+
+    public String getArrival() {
+        return arrival;
+    }
+
+    public void setArrival(String arrival) {
+        this.arrival = arrival;
+    }
+
+    public LocalDateTime getDepartureDateTime() {
+        return departureDateTime;
+    }
+
+    public void setDepartureDateTime(LocalDateTime departureDateTime) {
+        this.departureDateTime = departureDateTime;
+    }
+
+    public LocalDateTime getArrivalDateTime() {
+        return arrivalDateTime;
+    }
+
+    public void setArrivalDateTime(LocalDateTime arrivalDateTime) {
+        this.arrivalDateTime = arrivalDateTime;
+    }
+
+    public RestTemplate getRestTemplate() {
+        return restTemplate;
+    }
+
+    public void setRestTemplate(RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
     }
 }
