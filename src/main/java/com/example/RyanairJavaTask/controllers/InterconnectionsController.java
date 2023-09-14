@@ -26,7 +26,7 @@ public class InterconnectionsController {
         sb.append(flightsController.getDirectFlights().toString());
         sb.append("},{\"stops\":1,\"legs\":");
         sb.append(flightsController.getInterconnectedFlights().toString());
-        // return sb.toString();
-        return flightsController.getInterconnectingAirports().toString();
+        return sb.toString();
+        //return flightsController.getInterconnectingAirports().toString();
     }
 }

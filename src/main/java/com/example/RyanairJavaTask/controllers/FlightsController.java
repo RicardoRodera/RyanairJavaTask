@@ -1,5 +1,6 @@
 package com.example.RyanairJavaTask.controllers;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Month;
 import java.time.format.DateTimeFormatter;
@@ -106,8 +107,8 @@ public class FlightsController {
 
         String apiRoute = "";
 
-        apiRoute = generateApiRoute(departure, arrival, departureDateTime.getYear(),
-                departureDateTime.getMonthValue());
+        apiRoute = generateApiRoute(departure, arrival, year,
+                month);
 
         // Call the api and store the flights locally
         String response = restTemplate.getForObject(apiRoute, String.class);
@@ -118,9 +119,10 @@ public class FlightsController {
             for (Object day : jsonDays) {
                 if (day instanceof JSONObject) {
                     JSONObject dayObject = (JSONObject) day;
-
-                    if (dayObject.getInt("day") >= departureDateTime.getDayOfMonth()
-                            && (dayObject.getInt("day") <= arrivalDateTime.getDayOfMonth())) {
+                    // generar la fecha para comparar
+                    LocalDateTime date = generateDayDate(year, month, dayObject.getInt("day"), "23:59");
+                    if ((date.isEqual(departureDateTime) || date.isAfter(departureDateTime))
+                            && (date.isEqual(arrivalDateTime) || date.isBefore(arrivalDateTime))) {
 
                         JSONArray jsonFlights = (JSONArray) dayObject.get("flights");
                         for (Object flight : jsonFlights) {
@@ -128,17 +130,17 @@ public class FlightsController {
                                 JSONObject flightObject = (JSONObject) flight;
 
                                 LocalDateTime flightDepartureDateTime = generateFlightDateTime(
-                                        this.departureDateTime.getYear(), this.departureDateTime.getMonthValue(),
+                                        year, month,
                                         dayObject.getInt("day"), flightObject.getString("departureTime"));
 
                                 LocalDateTime flightArrivalDateTime = generateFlightDateTime(
-                                        departureDateTime.getYear(), departureDateTime.getMonthValue(),
+                                        year, month,
                                         dayObject.getInt("day"), flightObject.getString("arrivalTime"));
 
-                                if (flightDepartureDateTime.isAfter(departureDateTime)
-                                        || flightDepartureDateTime.isEqual(departureDateTime)
-                                                && flightArrivalDateTime.isBefore(arrivalDateTime)
-                                        || flightArrivalDateTime.isEqual(arrivalDateTime)) {
+                                if ((flightDepartureDateTime.isAfter(departureDateTime)
+                                        || flightDepartureDateTime.isEqual(departureDateTime))
+                                        && (flightArrivalDateTime.isBefore(arrivalDateTime)
+                                                || flightArrivalDateTime.isEqual(arrivalDateTime))) {
                                     directFlights.add(new Flight(departure, arrival, flightDepartureDateTime,
                                             flightArrivalDateTime));
                                 }
@@ -150,6 +152,21 @@ public class FlightsController {
         } else {
             // !! NO HAY VUELOS
         }
+    }
+
+    private LocalDateTime generateDayDate(int year, int month, int day, String time) {
+        StringBuilder sb = new StringBuilder().append(year).append("-");
+        if (month < 10) {
+            sb.append("0");
+        }
+        sb.append(month).append("-");
+        if (day < 10) {
+            sb.append("0");
+        }
+        sb.append(day).append("T").append(time);
+        DateTimeFormatter dateFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm");
+        LocalDateTime dateTime = LocalDateTime.parse(sb.toString(), dateFormat);
+        return dateTime;
     }
 
     private LocalDateTime generateFlightDateTime(int year, int month, int day, String flightTime) {
