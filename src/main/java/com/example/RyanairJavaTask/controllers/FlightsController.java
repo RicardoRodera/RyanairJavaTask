@@ -45,26 +45,109 @@ public class FlightsController {
             for (int year = departureDateTime.getYear(); year <= arrivalDateTime.getYear(); year++) {
                 if (year == departureDateTime.getYear()) {
                     for (int month = departureDateTime.getMonthValue(); month <= Month.DECEMBER.getValue(); month++) {
-                        addDirectFlightsOfYearAndMonth(departure, arrival, year, month);
+                        this.directFlights.addAll(getDirectFlightsOfYearAndMonth(departure, arrival, year, month));
+                        addInterconnectedFlightsOfYearAndMonth(year,
+                                month);
                     }
                 } else {
                     if (year == arrivalDateTime.getYear()) {
                         for (int month = Month.JANUARY.getValue(); month <= arrivalDateTime.getMonthValue(); month++) {
-                            addDirectFlightsOfYearAndMonth(departure, arrival, year, month);
+                            this.directFlights.addAll(getDirectFlightsOfYearAndMonth(departure, arrival, year, month));
+                            addInterconnectedFlightsOfYearAndMonth(
+                                    year, month);
                         }
                     } else {
                         for (int month = Month.JANUARY.getValue(); month <= Month.DECEMBER.getValue(); month++) {
-                            addDirectFlightsOfYearAndMonth(departure, arrival, year, month);
+                            this.directFlights.addAll(getDirectFlightsOfYearAndMonth(departure, arrival, year, month));
+                            addInterconnectedFlightsOfYearAndMonth(
+                                    year, month);
                         }
                     }
                 }
             }
         } else {
             for (int month = departureDateTime.getMonthValue(); month <= arrivalDateTime.getMonthValue(); month++) {
-                addDirectFlightsOfYearAndMonth(departure, arrival, departureDateTime.getYear(), month);
+                this.directFlights
+                        .addAll(getDirectFlightsOfYearAndMonth(departure, arrival, departureDateTime.getYear(), month));
+                addInterconnectedFlightsOfYearAndMonth(
+                        departureDateTime.getYear(), month);
             }
         }
     }
+
+    private void addInterconnectedFlightsOfYearAndMonth(int year, int month) {
+        if (!this.interconnectingAirports.isEmpty()) {
+            for (String interconnectingAirport : this.interconnectingAirports) {
+                ArrayList<Flight> firstFlights = getDirectFlightsOfYearAndMonth(this.departure, interconnectingAirport,
+                        year, month);
+                // Para cada vuelo busco si hay uno que lo conecte bien con el destino, hasta
+                // que haya uno que no.
+                // Cada vez que encuentra uno con destino viable, añade ambos a la lista final.
+                for (Flight flight : firstFlights) {
+                    Flight connectingFlight = searchConnectingFlight(interconnectingAirport, year, month, flight);
+                    if (connectingFlight != null) {
+                        this.interconnectedFlights.add(flight);
+                        this.interconnectedFlights.add(connectingFlight);
+                    }
+                }
+
+            }
+        }
+    }
+
+    private Flight searchConnectingFlight(String interconnectingAirport, int year, int month, Flight flight) {
+        String apiRoute = "";
+
+        apiRoute = generateApiRoute(interconnectingAirport, this.arrival, year,
+                month);
+
+        // Call the api and store the days with flights locally
+        String response = restTemplate.getForObject(apiRoute, String.class);
+        JSONObject jsonResponse = new JSONObject(response);
+        JSONArray jsonDays = (JSONArray) (jsonResponse.get("days"));
+        if (!jsonDays.isEmpty()) {
+
+            for (Object day : jsonDays) {
+                if (day instanceof JSONObject) {
+                    JSONObject dayObject = (JSONObject) day;
+                    // Generate the date of the day and the dateTime of the fist flight to make comparations
+                    LocalDateTime date = generateDayDate(year, month, dayObject.getInt("day"), "23:59");
+                    LocalDateTime departureDate = flight.getArrivalDateTime().plusHours(2);
+                    if ((date.isEqual(departureDate) || date.isAfter(departureDate))
+                            && (date.isEqual(arrivalDateTime) || date.isBefore(arrivalDateTime))) {
+                        // Get all flights of the day and check if they are in time for the schedule
+                        JSONArray jsonFlights = (JSONArray) dayObject.get("flights");
+                        for (Object connectingFlight : jsonFlights) {
+                            if (connectingFlight instanceof JSONObject) {
+                                JSONObject flightObject = (JSONObject) connectingFlight;
+
+                                LocalDateTime flightDepartureDateTime = generateFlightDateTime(
+                                        year, month,
+                                        dayObject.getInt("day"), flightObject.getString("departureTime"));
+
+                                LocalDateTime flightArrivalDateTime = generateFlightDateTime(
+                                        year, month,
+                                        dayObject.getInt("day"), flightObject.getString("arrivalTime"));
+
+                                if ((flightDepartureDateTime.isAfter(departureDate)
+                                        || flightDepartureDateTime.isEqual(departureDate))
+                                        && (flightArrivalDateTime.isBefore(arrivalDateTime)
+                                                || flightArrivalDateTime.isEqual(arrivalDateTime))) {
+                                                    
+                                    return (new Flight(interconnectingAirport, this.arrival, flightDepartureDateTime,
+                                            flightArrivalDateTime));
+
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    
 
     private ArrayList<String> getInterconnectingAirports(String departure, String arrival) {
         ArrayList<String> possibleInterconnections = new ArrayList<>();
@@ -103,14 +186,15 @@ public class FlightsController {
         return finalInterconnections;
     }
 
-    private void addDirectFlightsOfYearAndMonth(String departure, String arrival, int year, int month) {
+    private ArrayList<Flight> getDirectFlightsOfYearAndMonth(String departure, String arrival, int year, int month) {
 
+        ArrayList<Flight> flightList = new ArrayList<>();
         String apiRoute = "";
 
         apiRoute = generateApiRoute(departure, arrival, year,
                 month);
 
-        // Call the api and store the flights locally
+        // Call the api and store the days with flights locally
         String response = restTemplate.getForObject(apiRoute, String.class);
         JSONObject jsonResponse = new JSONObject(response);
         JSONArray jsonDays = (JSONArray) (jsonResponse.get("days"));
@@ -119,11 +203,11 @@ public class FlightsController {
             for (Object day : jsonDays) {
                 if (day instanceof JSONObject) {
                     JSONObject dayObject = (JSONObject) day;
-                    // generar la fecha para comparar
+                    // Generate the date to make comparations
                     LocalDateTime date = generateDayDate(year, month, dayObject.getInt("day"), "23:59");
                     if ((date.isEqual(departureDateTime) || date.isAfter(departureDateTime))
                             && (date.isEqual(arrivalDateTime) || date.isBefore(arrivalDateTime))) {
-
+                        // Get all flights of the day and check if they are in time for the schedule
                         JSONArray jsonFlights = (JSONArray) dayObject.get("flights");
                         for (Object flight : jsonFlights) {
                             if (flight instanceof JSONObject) {
@@ -141,7 +225,7 @@ public class FlightsController {
                                         || flightDepartureDateTime.isEqual(departureDateTime))
                                         && (flightArrivalDateTime.isBefore(arrivalDateTime)
                                                 || flightArrivalDateTime.isEqual(arrivalDateTime))) {
-                                    directFlights.add(new Flight(departure, arrival, flightDepartureDateTime,
+                                    flightList.add(new Flight(departure, arrival, flightDepartureDateTime,
                                             flightArrivalDateTime));
                                 }
                             }
@@ -149,9 +233,8 @@ public class FlightsController {
                     }
                 }
             }
-        } else {
-            // !! NO HAY VUELOS
         }
+        return flightList;
     }
 
     private LocalDateTime generateDayDate(int year, int month, int day, String time) {
