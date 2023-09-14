@@ -20,13 +20,17 @@ public class InterconnectionsController {
                 arrivalDateTime);
 
         StringBuilder sb = new StringBuilder();
-
-        // !!hay que hacer un toString que se vea como el resultado
-        sb.append("[{\"stops\":0,\"legs\":");
-        sb.append(flightsController.getDirectFlights().toString());
-        sb.append("},{\"stops\":1,\"legs\":");
-        sb.append(flightsController.getInterconnectedFlights().toString());
+        if (departureDateTime.isBefore(arrivalDateTime)) {
+            sb.append("[{\"stops\":0,\"legs\":");
+            //First get the direct flights if any
+            sb.append(flightsController.getDirectFlights().toString());
+            sb.append("},{\"stops\":1,\"legs\":");
+            //Then get the interconnected flights if any
+            sb.append(flightsController.getInterconnectedFlights().toString());
+            sb.append("}]");
+        } else {
+            sb.append("WARNING: PLEASE CHANGE THE GIVEN DEPARTURE AND/OR ARRIVAL DATES");
+        }
         return sb.toString();
-        //return flightsController.getInterconnectingAirports().toString();
     }
 }

@@ -1,6 +1,5 @@
 package com.example.RyanairJavaTask.controllers;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Month;
 import java.time.format.DateTimeFormatter;
@@ -34,9 +33,6 @@ public class FlightsController {
         this.arrival = arrival;
         this.departureDateTime = departureDateTime;
         this.arrivalDateTime = arrivalDateTime;
-
-        // Period period = Period.between(departureDateTime.toLocalDate(),
-        // arrivalDateTime.toLocalDate());
 
         // Check if there are intermediate airports for a "one stop" route;
         this.interconnectingAirports = getInterconnectingAirports(this.departure, this.arrival);
@@ -80,9 +76,9 @@ public class FlightsController {
             for (String interconnectingAirport : this.interconnectingAirports) {
                 ArrayList<Flight> firstFlights = getDirectFlightsOfYearAndMonth(this.departure, interconnectingAirport,
                         year, month);
-                // Para cada vuelo busco si hay uno que lo conecte bien con el destino, hasta
-                // que haya uno que no.
-                // Cada vez que encuentra uno con destino viable, añade ambos a la lista final.
+                // For each flight, it looks if there is one that connects it with the final
+                // arrival from the interconnecting airport. If it finds one, it adds both to
+                // the final list.
                 for (Flight flight : firstFlights) {
                     Flight connectingFlight = searchConnectingFlight(interconnectingAirport, year, month, flight);
                     if (connectingFlight != null) {
@@ -110,7 +106,8 @@ public class FlightsController {
             for (Object day : jsonDays) {
                 if (day instanceof JSONObject) {
                     JSONObject dayObject = (JSONObject) day;
-                    // Generate the date of the day and the dateTime of the fist flight to make comparations
+                    // Generate the date of the day and the dateTime of the fist flight +2h to make
+                    // comparations
                     LocalDateTime date = generateDayDate(year, month, dayObject.getInt("day"), "23:59");
                     LocalDateTime departureDate = flight.getArrivalDateTime().plusHours(2);
                     if ((date.isEqual(departureDate) || date.isAfter(departureDate))
@@ -133,7 +130,8 @@ public class FlightsController {
                                         || flightDepartureDateTime.isEqual(departureDate))
                                         && (flightArrivalDateTime.isBefore(arrivalDateTime)
                                                 || flightArrivalDateTime.isEqual(arrivalDateTime))) {
-                                                    
+                                    // Then gets the first flight possible acording to the specifications. Getting
+                                    // more than one would be possible but too many options would exist.
                                     return (new Flight(interconnectingAirport, this.arrival, flightDepartureDateTime,
                                             flightArrivalDateTime));
 
@@ -147,8 +145,9 @@ public class FlightsController {
         return null;
     }
 
-    
-
+    // This method creates two lists, one with the airports connected to the
+    // departure and other one with the airports connected to de arrival. Then
+    // checks which ones coincide and returns them.
     private ArrayList<String> getInterconnectingAirports(String departure, String arrival) {
         ArrayList<String> possibleInterconnections = new ArrayList<>();
         ArrayList<String> finalInterconnections = new ArrayList<>();
@@ -186,6 +185,9 @@ public class FlightsController {
         return finalInterconnections;
     }
 
+    // As the given API to get the flight schedules gives the flights for each
+    // month, this method is called once for each month in the period betweeen
+    // departure and arrival
     private ArrayList<Flight> getDirectFlightsOfYearAndMonth(String departure, String arrival, int year, int month) {
 
         ArrayList<Flight> flightList = new ArrayList<>();
@@ -203,7 +205,7 @@ public class FlightsController {
             for (Object day : jsonDays) {
                 if (day instanceof JSONObject) {
                     JSONObject dayObject = (JSONObject) day;
-                    // Generate the date to make comparations
+                    // Generate the "present" date to make comparations
                     LocalDateTime date = generateDayDate(year, month, dayObject.getInt("day"), "23:59");
                     if ((date.isEqual(departureDateTime) || date.isAfter(departureDateTime))
                             && (date.isEqual(arrivalDateTime) || date.isBefore(arrivalDateTime))) {
@@ -225,6 +227,7 @@ public class FlightsController {
                                         || flightDepartureDateTime.isEqual(departureDateTime))
                                         && (flightArrivalDateTime.isBefore(arrivalDateTime)
                                                 || flightArrivalDateTime.isEqual(arrivalDateTime))) {
+                                    // If they are, they get added to the list of possible flights
                                     flightList.add(new Flight(departure, arrival, flightDepartureDateTime,
                                             flightArrivalDateTime));
                                 }
