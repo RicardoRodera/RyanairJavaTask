@@ -31,6 +31,11 @@ public class InterconnectionsController {
         } else {
             sb.append("WARNING: PLEASE CHANGE THE GIVEN DEPARTURE AND/OR ARRIVAL DATES");
         }
-        return sb.toString();
+        try {
+            return sb.toString();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "ERROR while conerting from StringBuilder to String";
+        }
     }
 }
