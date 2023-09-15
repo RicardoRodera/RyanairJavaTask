@@ -26,3 +26,17 @@ http://localhost:8080/flights/interconnections?departure={departure}&arrival={ar
 
 For example:
 <a href="http://localhost:8080/flights/interconnections?departure=DUB&arrival=WRO&departureDateTime=2024-03-01T07:00&arrivalDateTime=2024-03-03T21:00">http://localhost:8080/flights/interconnections?departure=DUB&arrival=WRO&departureDateTime=2024-03-01T07:00&arrivalDateTime=2024-03-03T21:00</a>
+
+###App Logic
+
+The application checks every month between the date of departure and the date of arrival to get all flights from and to the designated airports. Then, checks if they aren't too soon or too late and returns them as the possible direct flights.
+
+Then, for the interconnected flights:
+1. Gets all routes and checks for routes that have the same departure as the asked flight, stores them, and then other list with all routes with the same arrival. It gets the airports that coincide as arrival of ones and departure of the others as these are the interconnecting airports.
+
+2. For each month of the departure/arrival period, gets all flights form departure to interconnecting airport and looks for the closes available flight from the interconnecting airport to the arrival with departure time at least 2 hour later than its arrival to the interconnection.
+
+3.If any, stores both in a final interconnected flights list which is returned.
+
+That way it gets all flights direct and interconnected(1 stop) from any period of time.
+(Please note that for larget intervals of time, the app has to check for exponentially increasing possible interconnected flights)
