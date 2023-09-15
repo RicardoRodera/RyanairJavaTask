@@ -36,7 +36,7 @@ Then, for the interconnected flights:
 
 2. For each month of the departure/arrival period, gets all flights form departure to interconnecting airport and looks for the closes available flight from the interconnecting airport to the arrival with departure time at least 2 hour later than its arrival to the interconnection.
 
-3.If any, stores both in a final interconnected flights list which is returned.
+3. If any, stores both in a final interconnected flights list which is returned.
 
 That way it gets all flights direct and interconnected(1 stop) from any period of time.
 (Please note that for larget intervals of time, the app has to check for exponentially increasing possible interconnected flights)
